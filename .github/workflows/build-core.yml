@@ -151,9 +151,19 @@ jobs:
 
       - name: Setup swap for LTO
         if: ${{ inputs.lto != 'none' }}
-        uses: pierotofy/set-swap-space@49819abfb41bd9b44fb781159c033dba90353a7c # v1.0
-        with:
-          swap-size-gb: 16
+        run: |
+          # The hosted runner can expose zram as the last swap device. The
+          # upstream action then tries to fallocate a 16 GiB swapfile on
+          # /dev/zram0 and fails with ENOSPC. Use a regular file on root.
+          sudo swapoff -a || true
+          sudo rm -f /swapfile
+          sudo fallocate -l 16G /swapfile || \
+            sudo dd if=/dev/zero of=/swapfile bs=1M count=16384 status=progress
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          swapon --show
+          free -h
 
       - name: Install build dependencies
         run: |
